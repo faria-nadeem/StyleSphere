@@ -35,8 +35,8 @@ def grabcut_segmentation(image: np.ndarray, iterations: int = 5) -> tuple[np.nda
     h, w = image.shape[:2]
     mask = np.zeros((h, w), np.uint8)
 
-    # Foreground rectangle – keep a 5 % margin on every side
-    margin_x, margin_y = int(w * 0.05), int(h * 0.05)
+    # Foreground rectangle – keep a 2 pixel margin on every side to capture trousers/long garments
+    margin_x, margin_y = 2, 2
     rect = (margin_x, margin_y, w - 2 * margin_x, h - 2 * margin_y)
 
     bgd_model = np.zeros((1, 65), np.float64)
@@ -57,10 +57,25 @@ def extract_color_features(image: np.ndarray, mask: np.ndarray | None = None) ->
     """
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    # Compute histogram on Hue channel within the garment mask
-    hist_h = cv2.calcHist([hsv], [0], mask, [180], [0, 180])
-    hist_s = cv2.calcHist([hsv], [1], mask, [256], [0, 256])
-    hist_v = cv2.calcHist([hsv], [2], mask, [256], [0, 256])
+    if mask is None:
+        mask = np.ones(image.shape[:2], dtype=np.uint8) * 255
+
+    # Filter out black/grey background pixels that were set to 0 by GrabCut mask
+    # This prevents 'H=0' (Black) from being detected as Red.
+    h_channel, s_channel, v_channel = cv2.split(hsv)
+    
+    # Require Saturation > 30 and Value > 30 for it to be considered a 'color'
+    color_mask = cv2.bitwise_and(mask, cv2.inRange(s_channel, 30, 255))
+    color_mask = cv2.bitwise_and(color_mask, cv2.inRange(v_channel, 30, 255))
+    
+    # If the garment is actually just black or white, fallback to original mask
+    if cv2.countNonZero(color_mask) < 50:
+        color_mask = mask
+
+    # Compute histogram on Hue channel within the valid color mask
+    hist_h = cv2.calcHist([hsv], [0], color_mask, [180], [0, 180])
+    hist_s = cv2.calcHist([hsv], [1], color_mask, [256], [0, 256])
+    hist_v = cv2.calcHist([hsv], [2], color_mask, [256], [0, 256])
 
     dominant_hue = int(np.argmax(hist_h))
     dominant_sat = int(np.argmax(hist_s))

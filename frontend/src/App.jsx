@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import UploadZone from "./components/UploadZone";
 import WardrobeGrid from "./components/WardrobeGrid";
-import { fetchGarments, deleteGarment } from "./api";
+import { fetchGarments, deleteGarment, tryOnGarment } from "./api";
 import "./index.css";
 
 const CATEGORIES = [
@@ -18,6 +18,13 @@ export default function App() {
   const [garments, setGarments] = useState([]);
   const [filter, setFilter] = useState("all");
   const [toast, setToast] = useState(null);
+
+  // Try-On State
+  const [userPhotoFile, setUserPhotoFile] = useState(null);
+  const [userPhotoUrl, setUserPhotoUrl] = useState(null);
+  const [tryOnResultUrl, setTryOnResultUrl] = useState(null);
+  const [isTryingOn, setIsTryingOn] = useState(false);
+  const [styleFeedback, setStyleFeedback] = useState(null);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -47,6 +54,40 @@ export default function App() {
       showToast("Garment removed", "success");
     } catch {
       showToast("Failed to delete", "error");
+    }
+  };
+
+  const handleUserPhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setUserPhotoFile(file);
+      setUserPhotoUrl(URL.createObjectURL(file));
+      setTryOnResultUrl(null);
+      setStyleFeedback(null);
+      showToast("User photo uploaded successfully");
+    }
+  };
+
+  const handleTryOn = async (garmentId) => {
+    if (!userPhotoFile) {
+      showToast("Please upload a Base Photo first to try on clothes!", "error");
+      return;
+    }
+
+    setIsTryingOn(true);
+    setTryOnResultUrl(null);
+    setStyleFeedback(null);
+    showToast("🧠 AI model is generating your try-on — this takes ~60 seconds...", "info");
+
+    try {
+      const data = await tryOnGarment(garmentId, userPhotoFile);
+      setTryOnResultUrl(data.tryon_image_base64);
+      setStyleFeedback(data.style_feedback);
+      showToast("✅ AI Try-On complete!", "success");
+    } catch (err) {
+      showToast(err.message || "Failed to process Try-On", "error");
+    } finally {
+      setIsTryingOn(false);
     }
   };
 
@@ -111,7 +152,64 @@ export default function App() {
             </button>
           ))}
         </div>
-        <WardrobeGrid garments={garments} filter={filter} onDelete={handleDelete} />
+        <WardrobeGrid garments={garments} filter={filter} onDelete={handleDelete} onTryOn={handleTryOn} />
+      </section>
+
+      {/* ── Try-On Mode ─────────────────────────── */}
+      <section style={{ marginBottom: 60 }} className="tryon-section">
+        <div className="section-header">
+          <h2 className="section-title"><span className="icon">📸</span> Try-On Mode</h2>
+          <p>Upload a photo of yourself, then click the ✨ icon on any garment to see how it looks!</p>
+        </div>
+        
+        <div className="tryon-container glass" style={{ padding: "2rem", borderRadius: "16px", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+          <div className="user-photo-zone" style={{ flex: "1 1 300px" }}>
+            <h3>1. Base Photo</h3>
+            <div className="upload-box" style={{ marginTop: 15, position: "relative" }}>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleUserPhotoUpload} 
+                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", zIndex: 2 }} 
+              />
+              {userPhotoUrl ? (
+                <img src={userPhotoUrl} alt="User Base" style={{ width: "100%", height: "auto", borderRadius: "8px", display: "block" }} />
+              ) : (
+                <div style={{ padding: "3rem 1rem", textAlign: "center", border: "2px dashed var(--border)", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>👤</div>
+                  <div>Click or drag to upload your photo</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="tryon-result-zone" style={{ flex: "1 1 300px" }}>
+            <h3>2. Live Preview</h3>
+            <div className="result-box" style={{ marginTop: 15, padding: "1rem", border: "2px dashed var(--border)", borderRadius: "8px", minHeight: "250px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative" }}>
+              {isTryingOn ? (
+                <div className="loader-container" style={{ textAlign: "center" }}>
+                  <div className="loader" style={{ fontSize: "2rem", animation: "spin 2s linear infinite" }}>🧠</div>
+                  <div style={{ marginTop: 10, fontWeight: "bold" }}>AI Diffusion Model is generating...</div>
+                  <div style={{ marginTop: 5, fontSize: "0.85rem", opacity: 0.7 }}>This takes ~60 seconds. Please wait.</div>
+                </div>
+              ) : tryOnResultUrl ? (
+                <>
+                  <img src={tryOnResultUrl} alt="Try-On Result" style={{ width: "100%", height: "auto", borderRadius: "8px", display: "block" }} />
+                  {styleFeedback && (
+                    <div className="feedback-badge" style={{ marginTop: "1rem", padding: "0.8rem", background: "var(--primary-light)", color: "var(--primary)", borderRadius: "8px", fontWeight: "bold", textAlign: "center", width: "100%" }}>
+                      💡 {styleFeedback}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: "center", opacity: 0.6 }}>
+                  <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>✨</div>
+                  <div>Select a garment to try on</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ── Toast ───────────────────────────────── */}

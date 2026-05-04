@@ -1,6 +1,6 @@
 import { getImageUrl } from "../api";
 
-export default function WardrobeGrid({ garments, filter, onDelete }) {
+export default function WardrobeGrid({ garments, filter, onDelete, onTryOn }) {
   const filtered = filter === "all"
     ? garments
     : garments.filter((g) => g.category === filter);
@@ -20,6 +20,9 @@ export default function WardrobeGrid({ garments, filter, onDelete }) {
       {filtered.map((g) => (
         <div className="garment-card" key={g.id}>
           <div className="card-actions">
+            {onTryOn && (
+              <button className="btn-icon" onClick={() => onTryOn(g.id)} title="Try On" style={{ marginRight: 8, fontSize: "1.2rem" }}>✨</button>
+            )}
             <button className="btn-icon" onClick={() => onDelete?.(g.id)} title="Remove">🗑</button>
           </div>
           <div className="card-image">
