@@ -78,6 +78,7 @@ async def upload_garment(
         name=name,
         category=category,
         original_filename=file.filename,
+        original_image_path=result.get("original_image_path", result["processed_image_path"]),
         image_path=result["processed_image_path"],
         mask_path=result["mask_path"],
         dominant_color_hex=result["dominant_color_hex"],

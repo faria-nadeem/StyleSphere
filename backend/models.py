@@ -31,8 +31,9 @@ class Garment(Base):
     name = Column(String(200), nullable=False)
     category = Column(String(50), default="other")  # top, bottom, dress, shoes, accessory, other
     original_filename = Column(String(255))
-    image_path = Column(Text)              # path to processed image
-    mask_path = Column(Text)               # path to segmentation mask
+    original_image_path = Column(Text)      # path to original unprocessed image (for AI try-on)
+    image_path = Column(Text)               # path to processed image (for wardrobe display)
+    mask_path = Column(Text)                # path to segmentation mask
 
     # Extracted features
     dominant_color_hex = Column(String(7))  # e.g. #FF5733

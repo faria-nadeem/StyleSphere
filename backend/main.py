@@ -107,15 +107,49 @@ async def try_on(
     if user_img is None:
         raise HTTPException(status_code=400, detail="Invalid user image")
 
-    # Garment image path
-    garment_path = garment.image_path
+    # Use the ORIGINAL unprocessed image for AI try-on (not the GrabCut-processed one)
+    garment_path = garment.original_image_path or garment.image_path
     if not os.path.exists(garment_path):
         raise HTTPException(status_code=500, detail="Garment image missing from disk")
 
-    # Save user image to a temp file for the API call
+    # --- Upscale small images for better AI results ---
+    MIN_DIM = 768  # minimum pixels on shortest side for good AI output
+
+    def upscale_if_needed(img, label="image"):
+        """Upscale image to at least MIN_DIM on shortest side using high-quality LANCZOS4."""
+        h, w = img.shape[:2]
+        shortest = min(h, w)
+        if shortest < MIN_DIM:
+            scale = MIN_DIM / shortest
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            print(f"[TryOn] Upscaling {label}: {w}x{h} → {new_w}x{new_h} (LANCZOS4)")
+            img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
+            # Sharpen after upscale to counteract blurriness from resize
+            gaussian = cv2.GaussianBlur(img, (0, 0), sigmaX=3)
+            img = cv2.addWeighted(img, 1.5, gaussian, -0.5, 0)
+            print(f"[TryOn] Applied unsharp mask sharpening to {label}")
+        return img
+
+    user_img = upscale_if_needed(user_img, "user photo")
+
+    garment_img = cv2.imread(garment_path, cv2.IMREAD_COLOR)
+    if garment_img is not None:
+        garment_img = upscale_if_needed(garment_img, "garment")
+
+    # Save processed images to temp files for the API call
     tmp_user = tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir="uploads")
     cv2.imwrite(tmp_user.name, user_img)
     tmp_user.close()
+
+    tmp_garment = tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir="uploads")
+    if garment_img is not None:
+        cv2.imwrite(tmp_garment.name, garment_img)
+    else:
+        # Fallback: copy original file
+        import shutil
+        shutil.copy2(garment_path, tmp_garment.name)
+    tmp_garment.close()
 
     try:
         from gradio_client import Client, handle_file
@@ -146,11 +180,11 @@ async def try_on(
 
         # === PRIMARY MODEL: OOTDiffusion (supports full-body / Dress) ===
         try:
-            client = Client("levihsu/OOTDiffusion", hf_token=HF_TOKEN)
+            client = Client("levihsu/OOTDiffusion", token=HF_TOKEN)
 
             result = client.predict(
                 vton_img=handle_file(tmp_user.name),
-                garm_img=handle_file(garment_path),
+                garm_img=handle_file(tmp_garment.name),
                 category=ootd_category,
                 n_samples=1,
                 n_steps=20,
@@ -171,7 +205,7 @@ async def try_on(
         if not result_image_path:
             try:
                 print("[TryOn] Falling back to IDM-VTON...")
-                client = Client("yisol/IDM-VTON", hf_token=HF_TOKEN)
+                client = Client("yisol/IDM-VTON", token=HF_TOKEN)
 
                 color = garment.dominant_color_name or ""
                 garment_des = f"{color} {garment.name or 'clothing'}, full length outfit"
@@ -182,7 +216,7 @@ async def try_on(
                         "layers": [],
                         "composite": None,
                     },
-                    garm_img=handle_file(garment_path),
+                    garm_img=handle_file(tmp_garment.name),
                     garment_des=garment_des,
                     is_checked=True,
                     is_checked_crop=False,
@@ -207,15 +241,10 @@ async def try_on(
         _, buffer = cv2.imencode('.jpg', result_img, [cv2.IMWRITE_JPEG_QUALITY, 95])
         b64_str = base64.b64encode(buffer).decode('utf-8')
 
-        # Style feedback
-        style_feedback = f"AI-powered try-on complete using {ai_model_used}!"
-        if garment.dominant_color_name:
-            style_feedback = f"The {garment.dominant_color_name} {garment.name or 'garment'} has been applied using {ai_model_used} AI!"
-
         return {
             "status": "success",
             "compatibility_score": 0.95,
-            "style_feedback": style_feedback,
+            "style_feedback": "",
             "tryon_image_base64": f"data:image/jpeg;base64,{b64_str}"
         }
 
@@ -231,5 +260,9 @@ async def try_on(
     finally:
         try:
             os.unlink(tmp_user.name)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp_garment.name)
         except OSError:
             pass

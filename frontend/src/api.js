@@ -3,8 +3,7 @@ const API = "http://localhost:8000";
 export async function uploadGarment(file, name, category, onProgress) {
   const steps = [
     "Validating image…",
-    "Applying Gaussian Blur…",
-    "Running GrabCut segmentation…",
+    "Running AI background removal…",
     "Extracting color features…",
     "Storing to database…",
   ];

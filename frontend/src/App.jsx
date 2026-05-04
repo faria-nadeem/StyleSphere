@@ -160,6 +160,9 @@ export default function App() {
         <div className="section-header">
           <h2 className="section-title"><span className="icon">📸</span> Try-On Mode</h2>
           <p>Upload a photo of yourself, then click the ✨ icon on any garment to see how it looks!</p>
+          <div style={{ marginTop: 10, padding: "12px 16px", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 10, fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+            <strong>💡 For best results:</strong> Use a <strong>front-facing photo</strong> with arms at your sides. Garment images work best on a <strong>hanger or flat-lay</strong> against a <strong>white background</strong> — model photos may cause distortion. AI generation takes ~60 seconds.
+          </div>
         </div>
         
         <div className="tryon-container glass" style={{ padding: "2rem", borderRadius: "16px", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
