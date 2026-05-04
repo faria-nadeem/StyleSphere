@@ -91,3 +91,20 @@ export async function tryOnGarment(garmentId, userPhotoFile) {
     throw e;
   }
 }
+
+export async function getRecommendations(userPhotoFile) {
+  const form = new FormData();
+  form.append("user_image", userPhotoFile);
+  form.append("user_id", "default-user");
+
+  const res = await fetch(`${API}/api/recommendations`, {
+    method: "POST",
+    body: form,
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Recommendation analysis failed");
+  }
+  return await res.json();
+}

@@ -40,9 +40,11 @@ def ai_background_removal(image_bytes: bytes) -> tuple[np.ndarray, np.ndarray]:
     alpha = result_np[:, :, 3]
     binary_mask = np.where(alpha > 128, 255, 0).astype(np.uint8)
 
-    # Convert RGBA to BGR for OpenCV (drop alpha, apply mask)
+    # Composite onto a solid white background (AI models prefer white backgrounds)
     bgr = cv2.cvtColor(result_np[:, :, :3], cv2.COLOR_RGB2BGR)
-    foreground = cv2.bitwise_and(bgr, bgr, mask=binary_mask)
+    white_bg = np.ones_like(bgr, dtype=np.uint8) * 255
+    alpha_3d = (alpha / 255.0)[:, :, np.newaxis]
+    foreground = (bgr * alpha_3d + white_bg * (1 - alpha_3d)).astype(np.uint8)
 
     return foreground, binary_mask
 

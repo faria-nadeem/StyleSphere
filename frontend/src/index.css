@@ -225,7 +225,8 @@ h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; }
 }
 .card-actions {
   position: absolute; top: 10px; right: 10px;
-  opacity: 0; transition: var(--transition);
+  display: flex; gap: 6px;
+  opacity: 0.85; transition: var(--transition);
 }
 .garment-card:hover .card-actions { opacity: 1; }
 .btn-icon {
@@ -323,4 +324,191 @@ h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; }
   .wardrobe-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
   .pipeline-tracker { flex-wrap: wrap; }
   .pipeline-step { min-width: 45%; }
+  .reco-upload-row { flex-direction: column; }
+  .reco-garment-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+
+/* ── Recommendation Panel ──────────────────────── */
+.reco-panel { margin-top: 8px; }
+
+.reco-upload-row {
+  display: flex; gap: 24px; align-items: stretch; margin-bottom: 28px;
+}
+.reco-photo-upload {
+  flex: 0 0 220px; min-height: 220px;
+  border-radius: var(--radius); overflow: hidden;
+  cursor: pointer; transition: var(--transition);
+  border: 2px dashed var(--border-glass);
+}
+.reco-photo-upload:hover { border-color: var(--mauve-deep); }
+.reco-photo-label {
+  display: flex; width: 100%; height: 100%;
+  align-items: center; justify-content: center; cursor: pointer;
+}
+.reco-photo-preview {
+  width: 100%; height: 100%; object-fit: cover; border-radius: calc(var(--radius) - 4px);
+}
+.reco-photo-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 20px;
+}
+.reco-upload-icon { font-size: 2.8rem; animation: floatIcon 3s ease-in-out infinite; }
+.reco-photo-hint { font-size: 0.72rem; opacity: 0.6; }
+
+.reco-action-area {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center; gap: 16px;
+}
+.reco-analyze-btn {
+  font-size: 1rem !important; padding: 16px 32px !important;
+  border-radius: var(--radius-sm) !important;
+  position: relative;
+}
+.reco-analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+.reco-action-hint {
+  font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; max-width: 420px;
+}
+
+.reco-spinner {
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid rgba(61,54,64,0.2); border-top-color: var(--text-primary);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.reco-error {
+  padding: 14px 20px; border-radius: var(--radius-sm);
+  background: rgba(212,181,176,0.15) !important; color: #A0706A;
+  border: 1px solid rgba(212,181,176,0.3) !important;
+  font-size: 0.85rem; margin-bottom: 24px;
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* ── Results Container ─────────────────────────── */
+.reco-results { animation: fadeIn 0.4s ease; }
+
+/* ── Skin Tone Card ────────────────────────────── */
+.reco-tone-card {
+  padding: 28px; border-radius: var(--radius);
+  margin-bottom: 28px; position: relative; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.5) !important;
+}
+.reco-tone-card::after {
+  content: ''; position: absolute; top: -50%; right: -20%;
+  width: 300px; height: 300px; border-radius: 50%;
+  background: rgba(255,255,255,0.12); pointer-events: none;
+}
+.reco-tone-header {
+  display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px;
+  position: relative; z-index: 1;
+}
+.reco-tone-emoji { font-size: 2.8rem; line-height: 1; }
+.reco-tone-title {
+  font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 700;
+  margin-bottom: 6px; color: var(--text-primary);
+}
+.reco-tone-desc { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; }
+
+.reco-tone-tip {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 14px 18px; border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.45); backdrop-filter: blur(8px);
+  font-size: 0.84rem; color: var(--text-primary); line-height: 1.5;
+  margin-bottom: 18px; position: relative; z-index: 1;
+}
+.reco-tip-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+
+.reco-best-colors { position: relative; z-index: 1; }
+.reco-colors-label {
+  display: block; font-size: 0.72rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  color: var(--text-muted); margin-bottom: 10px;
+}
+.reco-color-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.reco-color-chip {
+  padding: 5px 14px; border-radius: 100px; font-size: 0.75rem;
+  font-weight: 500; text-transform: capitalize;
+  background: rgba(255,255,255,0.55); backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.6); color: var(--text-primary);
+  transition: var(--transition);
+}
+.reco-color-chip:hover { background: rgba(255,255,255,0.8); transform: translateY(-1px); }
+
+/* ── Section Titles ────────────────────────────── */
+.reco-section { margin-bottom: 28px; }
+.reco-section-title {
+  font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 600;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+}
+.reco-match-icon { font-size: 1.2rem; }
+.reco-count {
+  padding: 2px 10px; border-radius: 100px; font-size: 0.7rem;
+  background: rgba(181,196,177,0.2); color: #6B8C62;
+  font-weight: 600;
+}
+.reco-count-warn { background: rgba(212,181,176,0.2); color: #A0706A; }
+
+/* ── Garment Grid ──────────────────────────────── */
+.reco-garment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 16px;
+}
+.reco-garment-card {
+  border-radius: var(--radius-sm); overflow: hidden;
+  position: relative; transition: var(--transition);
+  border: 1px solid var(--border-glass) !important;
+  cursor: default;
+}
+.reco-garment-card:hover {
+  transform: translateY(-3px); box-shadow: var(--shadow-hover);
+}
+.reco-garment-muted { opacity: 0.65; filter: saturate(0.5); }
+.reco-garment-muted:hover { opacity: 0.85; filter: saturate(0.7); }
+
+.reco-garment-score-badge {
+  position: absolute; top: 10px; right: 10px; z-index: 3;
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 0.68rem; font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+.reco-good {
+  background: rgba(181,196,177,0.75); color: #3D5A35;
+  border: 1px solid rgba(107,140,98,0.3);
+}
+.reco-low {
+  background: rgba(212,181,176,0.75); color: #7A4A42;
+  border: 1px solid rgba(160,112,106,0.3);
+}
+
+.reco-garment-img {
+  width: 100%; aspect-ratio: 3/4; overflow: hidden;
+  background: rgba(196,183,203,0.06);
+  display: flex; align-items: center; justify-content: center;
+}
+.reco-garment-img img { width: 100%; height: 100%; object-fit: cover; }
+.reco-garment-placeholder { font-size: 2.4rem; color: var(--text-muted); }
+
+.reco-garment-info { padding: 12px 14px; }
+.reco-garment-name {
+  display: block; font-family: 'Outfit', sans-serif; font-weight: 600;
+  font-size: 0.85rem; margin-bottom: 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.reco-garment-color {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.72rem; color: var(--text-muted);
+}
+
+.reco-empty {
+  text-align: center; padding: 40px 20px; color: var(--text-muted);
+  font-size: 0.88rem;
+}
+.reco-empty span { font-size: 2rem; display: block; margin-bottom: 10px; }
+
+/* ── Avoid Section ─────────────────────────────── */
+.reco-avoid-section {
+  padding-top: 24px;
+  border-top: 1px solid var(--border-glass);
 }

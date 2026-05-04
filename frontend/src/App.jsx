@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import UploadZone from "./components/UploadZone";
 import WardrobeGrid from "./components/WardrobeGrid";
+import RecommendationPanel from "./components/RecommendationPanel";
 import { fetchGarments, deleteGarment, tryOnGarment } from "./api";
 import "./index.css";
 
@@ -153,6 +154,17 @@ export default function App() {
           ))}
         </div>
         <WardrobeGrid garments={garments} filter={filter} onDelete={handleDelete} onTryOn={handleTryOn} />
+      </section>
+
+      {/* ── Recommendations ───────────────────────── */}
+      <section style={{ marginBottom: 60 }}>
+        <div className="section-header">
+          <h2 className="section-title"><span className="icon">🎨</span> Skin-Tone Recommendations</h2>
+        </div>
+        <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem", marginBottom: 20, marginTop: -12 }}>
+          Upload a selfie and our AI will analyze your skin tone to recommend the most flattering garments from your wardrobe.
+        </p>
+        <RecommendationPanel garments={garments} />
       </section>
 
       {/* ── Try-On Mode ─────────────────────────── */}
