@@ -124,6 +124,53 @@ async def try_on(
         return img
 
     user_img = upscale_if_needed(user_img, "user photo")
+    
+    # --- Untucked Hack: Stretch the shirt downwards to trick IDM-VTON's auto-parser ---
+    category = (garment.category or "other").lower()
+    name = (garment.name or "").lower()
+    sa_keywords = ["shalwar", "kameez", "suit", "kurta", "lehnga", "lehenga",
+                   "anarkali", "sharara", "gharara", "frock", "maxi", "abaya",
+                   "dress", "gown", "jumpsuit", "romper", "saree", "sari"]
+    is_full_length = any(kw in name for kw in sa_keywords) or category in ("dress", "other")
+
+    if category != "bottom" and not is_full_length:
+        try:
+            pose = pose_estimator.estimate(user_img)
+            seg = body_segmentor.segment(user_img)
+            if pose.get("status") == "ok" and seg.get("status") == "ok":
+                lm = pose["landmarks"]
+                h, w = user_img.shape[:2]
+                
+                # Check if we have hip landmarks
+                if len(lm) > 24:
+                    l_hip = (int(lm[23]["x"] * w), int(lm[23]["y"] * h))
+                    r_hip = (int(lm[24]["x"] * w), int(lm[24]["y"] * h))
+                    
+                    hip_y = min(l_hip[1], r_hip[1])
+                    hip_width = abs(r_hip[0] - l_hip[0])
+                    waist_y = max(0, hip_y - int(hip_width * 0.3))
+                    
+                    band_height = int(hip_width * 0.15)
+                    if waist_y - band_height > 0:
+                        band = user_img[waist_y - band_height:waist_y, :]
+                        
+                        # Target stretch goes down past the hips
+                        stretch_target_y = min(h, hip_y + int(hip_width * 0.5))
+                        stretch_height = stretch_target_y - waist_y
+                        
+                        if stretch_height > 0:
+                            stretched = cv2.resize(band, (w, stretch_height))
+                            mask = np.array(seg["mask"], dtype=np.uint8)
+                            
+                            for y in range(waist_y, stretch_target_y):
+                                row_idx = y - waist_y
+                                body_pixels = mask[y, :] > 128
+                                user_img[y, body_pixels] = stretched[row_idx, body_pixels]
+                                
+                            print(f"[TryOn] Stretched shirt downwards by {stretch_height}px to force untucked mask")
+        except Exception as e:
+            print(f"[TryOn] Failed to stretch shirt: {e}")
+    # --- End Untucked Hack ---
 
     garment_img = cv2.imread(garment_path, cv2.IMREAD_COLOR)
     if garment_img is not None:
@@ -146,12 +193,6 @@ async def try_on(
         category = (garment.category or "other").lower()
         name = (garment.name or "").lower()
         color = garment.dominant_color_name or ""
-
-        # keywords for full-length outfits (desi + western)
-        sa_keywords = ["shalwar", "kameez", "suit", "kurta", "lehnga", "lehenga",
-                       "anarkali", "sharara", "gharara", "frock", "maxi", "abaya",
-                       "dress", "gown", "jumpsuit", "romper", "saree", "sari"]
-        is_full_length = any(kw in name for kw in sa_keywords) or category in ("dress", "other")
 
         result_img = None
 
