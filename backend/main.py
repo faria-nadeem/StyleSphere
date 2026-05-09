@@ -184,7 +184,7 @@ async def try_on(
             if is_full_length:
                 garment_des = f"{color} {name or 'clothing'}, full length flowing outfit, long dress, photorealistic"
             else:
-                garment_des = f"{color} {name or 'clothing'}, upper body top shirt blouse, photorealistic"
+                garment_des = f"{color} {name or 'clothing'}, untucked upper body top shirt blouse, hanging loose outside pants, not tucked in, photorealistic"
 
             print(f"[TryOn] Using IDM-VTON | Prompt: {garment_des}")
 

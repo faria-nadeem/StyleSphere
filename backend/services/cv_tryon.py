@@ -91,13 +91,13 @@ def try_on_bottom(user_img: np.ndarray, pants_img: np.ndarray) -> np.ndarray:
     l_hip, r_hip = lm['l_hip'], lm['r_hip']
     l_ankle, r_ankle = lm['l_ankle'], lm['r_ankle']
 
-    # Define waist line (above hips — where real waistband sits)
+    # Define waist line (higher up to cover real waistband and high-waisted pants)
     hip_y = min(l_hip[1], r_hip[1])
     hip_width = abs(r_hip[0] - l_hip[0])
-    waist_y = max(0, hip_y - int(hip_width * 0.35))
+    waist_y = max(0, hip_y - int(hip_width * 0.65))
 
-    # Define ankle cutoff (stop above shoes)
-    ankle_y = max(l_ankle[1], r_ankle[1]) - int(hip_width * 0.1)
+    # Define ankle cutoff (stop right at the shoes)
+    ankle_y = max(l_ankle[1], r_ankle[1]) + int(hip_width * 0.1)
 
     # Restrict body mask to lower body only (waist to ankles, no shoes)
     leg_mask = body_mask.copy()
@@ -161,14 +161,14 @@ def try_on_bottom(user_img: np.ndarray, pants_img: np.ndarray) -> np.ndarray:
     # ── Step 5: Feathered edge blending ──
     feathered_mask = cv2.GaussianBlur(leg_mask, (31, 31), 12)
 
-    # Smooth transition at waist (larger zone for natural blend)
-    transition_height = int(hip_width * 0.4)
+    # Smooth transition at waist (smaller zone to avoid revealing original waistband)
+    transition_height = int(hip_width * 0.1)
     for y in range(max(0, waist_y), min(h, waist_y + transition_height)):
         t = (y - waist_y) / max(transition_height, 1)
         feathered_mask[y, :] = (feathered_mask[y, :].astype(np.float32) * t).astype(np.uint8)
 
-    # Smooth transition at ankle hem
-    hem_height = int(hip_width * 0.2)
+    # Smooth transition at ankle hem (smaller zone)
+    hem_height = int(hip_width * 0.05)
     for y in range(max(0, ankle_y - hem_height), min(h, ankle_y)):
         t = 1.0 - ((y - (ankle_y - hem_height)) / max(hem_height, 1))
         feathered_mask[y, :] = (feathered_mask[y, :].astype(np.float32) * t).astype(np.uint8)
