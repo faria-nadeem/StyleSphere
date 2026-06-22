@@ -1,7 +1,4 @@
-"""
-SQLAlchemy models for StyleSphere.
-Stores garment metadata, extracted features, and user wardrobe data.
-"""
+# models.py - database tables for users and garments
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Float, DateTime, JSON, Text, ForeignKey
@@ -29,20 +26,21 @@ class Garment(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     name = Column(String(200), nullable=False)
-    category = Column(String(50), default="other")  # top, bottom, dress, shoes, accessory, other
+    category = Column(String(50), default="other")
     original_filename = Column(String(255))
-    image_path = Column(Text)              # path to processed image
-    mask_path = Column(Text)               # path to segmentation mask
+    original_image_path = Column(Text)       # original unprocessed image
+    image_path = Column(Text)                # processed image (bg removed)
+    mask_path = Column(Text)                 # segmentation mask
 
-    # Extracted features
-    dominant_color_hex = Column(String(7))  # e.g. #FF5733
+    # color features extracted by our pipeline
+    dominant_color_hex = Column(String(7))
     dominant_color_name = Column(String(50))
-    color_histogram = Column(JSON)          # HSV histogram data
+    color_histogram = Column(JSON)
     confidence_score = Column(Float, default=0.0)
 
-    # AI pipeline metadata
-    pose_data = Column(JSON)                # placeholder for pose keypoints
-    segmentation_class = Column(String(50)) # placeholder for body-seg class
+    # pose and segmentation data
+    pose_data = Column(JSON)
+    segmentation_class = Column(String(50))
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

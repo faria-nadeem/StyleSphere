@@ -3,8 +3,7 @@ const API = "http://localhost:8000";
 export async function uploadGarment(file, name, category, onProgress) {
   const steps = [
     "Validating image…",
-    "Applying Gaussian Blur…",
-    "Running GrabCut segmentation…",
+    "Running AI background removal…",
     "Extracting color features…",
     "Storing to database…",
   ];
@@ -60,4 +59,52 @@ export function getImageUrl(path) {
   if (!path) return null;
   const normalized = path.replace(/\\/g, "/");
   return `${API}/${normalized}`;
+}
+
+export async function tryOnGarment(garmentId, userPhotoFile) {
+  const form = new FormData();
+  form.append("garment_id", garmentId);
+  form.append("user_image", userPhotoFile);
+
+  // AI model can take up to 2 minutes — set a generous timeout
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 180000); // 3 min
+
+  try {
+    const res = await fetch(`${API}/api/tryon`, {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Try-On failed");
+    }
+    return await res.json();
+  } catch (e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') {
+      throw new Error("AI model took too long. The server might be busy — please try again.");
+    }
+    throw e;
+  }
+}
+
+export async function getRecommendations(userPhotoFile) {
+  const form = new FormData();
+  form.append("user_image", userPhotoFile);
+  form.append("user_id", "default-user");
+
+  const res = await fetch(`${API}/api/recommendations`, {
+    method: "POST",
+    body: form,
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Recommendation analysis failed");
+  }
+  return await res.json();
 }

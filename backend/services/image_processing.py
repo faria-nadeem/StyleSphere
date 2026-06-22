@@ -1,10 +1,13 @@
 """
 Digital Image Processing pipeline for StyleSphere.
-Handles: Gaussian blur, GrabCut segmentation, HSV color analysis.
+Handles: AI background removal (rembg/U2-Net), HSV color analysis.
 """
 import cv2
 import numpy as np
 from pathlib import Path
+from rembg import remove
+from PIL import Image
+import io
 
 # ─── Colour name lookup table ───────────────────────────────────────────────
 COLOR_RANGES = [
@@ -20,47 +23,56 @@ COLOR_RANGES = [
 ]
 
 
-def apply_gaussian_blur(image: np.ndarray, kernel_size: int = 5) -> np.ndarray:
+def ai_background_removal(image_bytes: bytes) -> tuple[np.ndarray, np.ndarray]:
     """
-    Step 1 – Noise reduction via Gaussian Blur.
+    Remove background using rembg (U2-Net deep learning model).
+    This is the same class of model used by Zara, remove.bg, etc.
+    Returns (foreground_rgba, binary_mask).
     """
-    return cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
+    # rembg works on raw bytes and returns RGBA PNG
+    result_bytes = remove(image_bytes)
 
+    # Convert result to numpy arrays
+    result_pil = Image.open(io.BytesIO(result_bytes)).convert("RGBA")
+    result_np = np.array(result_pil)
 
-def grabcut_segmentation(image: np.ndarray, iterations: int = 5) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Step 2 – Background removal using GrabCut.
-    Returns (foreground_image, binary_mask).
-    """
-    h, w = image.shape[:2]
-    mask = np.zeros((h, w), np.uint8)
+    # Extract the alpha channel as the mask
+    alpha = result_np[:, :, 3]
+    binary_mask = np.where(alpha > 128, 255, 0).astype(np.uint8)
 
-    # Foreground rectangle – keep a 5 % margin on every side
-    margin_x, margin_y = int(w * 0.05), int(h * 0.05)
-    rect = (margin_x, margin_y, w - 2 * margin_x, h - 2 * margin_y)
-
-    bgd_model = np.zeros((1, 65), np.float64)
-    fgd_model = np.zeros((1, 65), np.float64)
-
-    cv2.grabCut(image, mask, rect, bgd_model, fgd_model, iterations, cv2.GC_INIT_WITH_RECT)
-
-    # Convert mask: 0/2 → background, 1/3 → foreground
-    binary_mask = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 255, 0).astype("uint8")
-    foreground = cv2.bitwise_and(image, image, mask=binary_mask)
+    # Composite onto a solid white background (AI models prefer white backgrounds)
+    bgr = cv2.cvtColor(result_np[:, :, :3], cv2.COLOR_RGB2BGR)
+    white_bg = np.ones_like(bgr, dtype=np.uint8) * 255
+    alpha_3d = (alpha / 255.0)[:, :, np.newaxis]
+    foreground = (bgr * alpha_3d + white_bg * (1 - alpha_3d)).astype(np.uint8)
 
     return foreground, binary_mask
 
 
 def extract_color_features(image: np.ndarray, mask: np.ndarray | None = None) -> dict:
     """
-    Step 3 – Convert to HSV, compute histogram, find dominant colour.
+    Convert to HSV, compute histogram, find dominant colour.
     """
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    # Compute histogram on Hue channel within the garment mask
-    hist_h = cv2.calcHist([hsv], [0], mask, [180], [0, 180])
-    hist_s = cv2.calcHist([hsv], [1], mask, [256], [0, 256])
-    hist_v = cv2.calcHist([hsv], [2], mask, [256], [0, 256])
+    if mask is None:
+        mask = np.ones(image.shape[:2], dtype=np.uint8) * 255
+
+    # Filter out black/grey background pixels
+    h_channel, s_channel, v_channel = cv2.split(hsv)
+
+    # Require Saturation > 30 and Value > 30 for it to be considered a 'color'
+    color_mask = cv2.bitwise_and(mask, cv2.inRange(s_channel, 30, 255))
+    color_mask = cv2.bitwise_and(color_mask, cv2.inRange(v_channel, 30, 255))
+
+    # If the garment is actually just black or white, fallback to original mask
+    if cv2.countNonZero(color_mask) < 50:
+        color_mask = mask
+
+    # Compute histogram on Hue channel within the valid color mask
+    hist_h = cv2.calcHist([hsv], [0], color_mask, [180], [0, 180])
+    hist_s = cv2.calcHist([hsv], [1], color_mask, [256], [0, 256])
+    hist_v = cv2.calcHist([hsv], [2], color_mask, [256], [0, 256])
 
     dominant_hue = int(np.argmax(hist_h))
     dominant_sat = int(np.argmax(hist_s))
@@ -105,6 +117,7 @@ def run_full_pipeline(image_bytes: bytes, save_dir: str, filename: str) -> dict:
     Execute the complete DIP pipeline on raw image bytes.
     Returns paths + extracted features.
     """
+    # Decode original image
     nparr = np.frombuffer(image_bytes, np.uint8)
     image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if image is None:
@@ -115,22 +128,22 @@ def run_full_pipeline(image_bytes: bytes, save_dir: str, filename: str) -> dict:
 
     stem = Path(filename).stem
 
-    # Step 1 — Gaussian Blur
-    blurred = apply_gaussian_blur(image)
+    # Step 1 — AI Background Removal (U2-Net via rembg)
+    foreground, mask = ai_background_removal(image_bytes)
 
-    # Step 2 — GrabCut Segmentation
-    foreground, mask = grabcut_segmentation(blurred)
-
-    # Step 3 — Colour Feature Extraction
+    # Step 2 — Colour Feature Extraction
     features = extract_color_features(foreground, mask)
 
     # Save artefacts
+    original_path = str(save_path / f"{stem}_original.png")
     processed_path = str(save_path / f"{stem}_processed.png")
     mask_path = str(save_path / f"{stem}_mask.png")
-    cv2.imwrite(processed_path, foreground)
+    cv2.imwrite(original_path, image)       # Original for AI try-on
+    cv2.imwrite(processed_path, foreground)  # Processed for wardrobe display
     cv2.imwrite(mask_path, mask)
 
     return {
+        "original_image_path": original_path,
         "processed_image_path": processed_path,
         "mask_path": mask_path,
         **features,

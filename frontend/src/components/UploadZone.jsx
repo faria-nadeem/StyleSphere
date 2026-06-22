@@ -50,10 +50,9 @@ export default function UploadZone({ onUploadComplete }) {
 
   const pipelineSteps = [
     { num: "01", label: "Validate" },
-    { num: "02", label: "Gaussian Blur" },
-    { num: "03", label: "GrabCut" },
-    { num: "04", label: "Color Extract" },
-    { num: "05", label: "Store" },
+    { num: "02", label: "AI Background Removal" },
+    { num: "03", label: "Color Extract" },
+    { num: "04", label: "Store" },
   ];
 
   const progress = step.total > 0 ? (step.current / step.total) * 100 : 0;
@@ -78,6 +77,9 @@ export default function UploadZone({ onUploadComplete }) {
             <div className="upload-icon">✨</div>
             <h3>Drop your garment image here</h3>
             <p>Supports JPG, PNG, WebP, BMP — or click to browse</p>
+            <div style={{ marginTop: 12, padding: "10px 16px", background: "rgba(255,193,7,0.1)", border: "1px solid rgba(255,193,7,0.3)", borderRadius: 8, fontSize: "0.82rem", color: "var(--text-secondary)", maxWidth: 420, margin: "12px auto 0" }}>
+              <strong>📌 Best results tip:</strong> Use garment photos on a <strong>hanger</strong> or <strong>flat-lay</strong> against a <strong>plain/white background</strong>. Avoid photos with models — their hands and body may distort the try-on result.
+            </div>
           </>
         ) : (
           <>
@@ -120,7 +122,7 @@ export default function UploadZone({ onUploadComplete }) {
               <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value)}>
                 <option value="top">Top</option>
                 <option value="bottom">Bottom</option>
-                <option value="dress">Dress</option>
+                <option value="dress">Dress / Suit / Full Outfit</option>
                 <option value="shoes">Shoes</option>
                 <option value="accessory">Accessory</option>
                 <option value="other">Other</option>

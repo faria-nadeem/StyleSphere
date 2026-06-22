@@ -1,6 +1,4 @@
-"""
-Garment upload & processing routes.
-"""
+# garments.py - routes for uploading, listing, and deleting garments
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
@@ -22,7 +20,7 @@ def _validate_image(filename: str) -> None:
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported image format '{ext}'. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+            detail=f"Unsupported format '{ext}'. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
 
@@ -34,13 +32,10 @@ async def upload_garment(
     user_id: str = Form("default-user"),
     db: Session = Depends(get_db),
 ):
-    """
-    Upload an image → run the full DIP pipeline → store features in DB.
-    Returns garment metadata + extracted features.
-    """
+    """upload image -> run processing pipeline -> save to db"""
     _validate_image(file.filename)
 
-    # Ensure user exists
+    # create user if they dont exist yet
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         user = User(id=user_id, username=user_id)
@@ -51,13 +46,13 @@ async def upload_garment(
     garment_id = str(uuid.uuid4())
     save_dir = str(UPLOAD_DIR / garment_id)
 
-    # Run DIP pipeline
+    # run the image processing pipeline
     try:
         result = run_full_pipeline(image_bytes, save_dir, file.filename)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    # Optional AI processing
+    # try to get pose and segmentation data (optional, wont crash if it fails)
     pose_data = None
     seg_class = None
     try:
@@ -70,7 +65,7 @@ async def upload_garment(
             seg_result = body_segmentor.segment(img)
             seg_class = "person" if seg_result["status"] == "ok" else None
     except Exception:
-        pass  # AI features are optional
+        pass
 
     garment = Garment(
         id=garment_id,
@@ -78,6 +73,7 @@ async def upload_garment(
         name=name,
         category=category,
         original_filename=file.filename,
+        original_image_path=result.get("original_image_path", result["processed_image_path"]),
         image_path=result["processed_image_path"],
         mask_path=result["mask_path"],
         dominant_color_hex=result["dominant_color_hex"],
@@ -108,7 +104,7 @@ async def upload_garment(
 
 @router.get("/")
 def list_garments(user_id: str = "default-user", db: Session = Depends(get_db)):
-    """Return all garments for a user."""
+    """get all garments for a user"""
     garments = db.query(Garment).filter(Garment.user_id == user_id).order_by(Garment.created_at.desc()).all()
     return [
         {
@@ -126,7 +122,7 @@ def list_garments(user_id: str = "default-user", db: Session = Depends(get_db)):
 
 @router.get("/{garment_id}")
 def get_garment(garment_id: str, db: Session = Depends(get_db)):
-    """Fetch a single garment by ID."""
+    """get a single garment by id"""
     garment = db.query(Garment).filter(Garment.id == garment_id).first()
     if not garment:
         raise HTTPException(status_code=404, detail="Garment not found")
@@ -147,7 +143,7 @@ def get_garment(garment_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/{garment_id}")
 def delete_garment(garment_id: str, db: Session = Depends(get_db)):
-    """Delete a garment."""
+    """delete a garment"""
     garment = db.query(Garment).filter(Garment.id == garment_id).first()
     if not garment:
         raise HTTPException(status_code=404, detail="Garment not found")

@@ -1,6 +1,4 @@
-"""
-Database setup for StyleSphere using SQLAlchemy with SQLite.
-"""
+# database.py - sets up SQLite database using SQLAlchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
@@ -15,7 +13,7 @@ class Base(DeclarativeBase):
 
 
 def get_db():
-    """Dependency that provides a database session."""
+    """gives a db session, closes it when done"""
     db = SessionLocal()
     try:
         yield db
@@ -24,5 +22,5 @@ def get_db():
 
 
 def init_db():
-    """Create all database tables."""
+    """creates the tables if they dont exist yet"""
     Base.metadata.create_all(bind=engine)
